@@ -1,14 +1,24 @@
 package com.example.pamfinal.presentation.navigation
 
 import androidx.compose.runtime.*
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import com.example.pamfinal.presentation.screens.DashboardScreen
 import com.example.pamfinal.presentation.screens.LoginScreen
+import com.example.pamfinal.presentation.screens.PegawaiListScreen
 import com.example.pamfinal.presentation.screens.RegisterScreen
 import com.example.pamfinal.presentation.viewmodel.AppViewModel
-import com.example.pamfinal.presentation.viewmodel.AuthUiState
 import com.example.pamfinal.presentation.viewmodel.AuthViewModel
 import com.example.pamfinal.presentation.viewmodel.DashboardViewModel
+import com.example.pamfinal.presentation.viewmodel.PegawaiViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.ViewModelProvider
+import com.example.pamfinal.data.remote.model.ApiConfig
+import com.example.pamfinal.presentation.viewmodel.PegawaiViewModelFactory
+import com.example.pamfinal.domain.repository.PegawaiRepositoryImpl
+import com.example.pamfinal.domain.usecase.GetPegawaiUseCase
+import com.example.pamfinal.domain.usecase.DeletePegawaiUseCase
+
 
 @Composable
 fun AppNavHost(
@@ -20,19 +30,27 @@ fun AppNavHost(
     val tokens by appVm.tokens.collectAsState()
     val authState by authVm.state.collectAsState()
 
+    // === Repository & UseCase ===
+    val pegawaiRepository = PegawaiRepositoryImpl(
+        api = ApiConfig.pegawaiApi // sesuaikan dengan ApiConfig kamu
+    )
+
+    val getPegawaiUseCase = GetPegawaiUseCase(pegawaiRepository)
+    val deletePegawaiUseCase = DeletePegawaiUseCase(pegawaiRepository)
+
+// === Factory ===
+    val pegawaiVm: PegawaiViewModel = viewModel(
+        factory = PegawaiViewModelFactory(
+            getPegawaiUseCase,
+            deletePegawaiUseCase
+        )
+    )
 
 
     LaunchedEffect(tokens?.accessToken) {
         val isLoggedIn = !tokens?.accessToken.isNullOrBlank()
-
         if (isLoggedIn) {
-            val role = tokens?.role?.lowercase()
-            val dest = when (role) {
-                "admin" -> Routes.DASHBOARD_ADMIN
-                "user" -> Routes.DASHBOARD_USER
-                else -> Routes.DASHBOARD // default
-            }
-            nav.navigate(dest) {
+            nav.navigate(Routes.LIST_PEGAWAI) {
                 popUpTo(Routes.LOGIN) { inclusive = true }
             }
         }
@@ -79,6 +97,17 @@ fun AppNavHost(
                 title = "Dashboard User",
                 role = tokens?.role ?: "user",
                 onLogout = { dashboardVm.logout() }
+            )
+        }
+        composable(Routes.LIST_PEGAWAI) {
+            PegawaiListScreen(
+                vm = pegawaiVm,
+                onAdd = {
+                    nav.navigate(Routes.ADD_PEGAWAI)
+                },
+                onEdit = { pegawai ->
+                    nav.navigate("${Routes.EDIT_PEGAWAI}/${pegawai.id_pegawai}")
+                }
             )
         }
     }
